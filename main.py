@@ -1,24 +1,20 @@
-from orchestrator import ResearchOrchestrator
+from conversation_manager import ConversationManager
 
 def main():
-    orchestrator = ResearchOrchestrator()
-
-    print('=== Research Assistant ===')
-    print('Type a research topic and press Enter.')
+    manager = ConversationManager()
+    print('=== Research Assistant (Conversational Mode) ===')
+    print('Chat normally, or say "research <topic>" to trigger a report.')
     print('Type "quit" to exit.\n')
 
     while True:
-        query = input('Research topic: ').strip()
-        if query.lower() in ('quit', 'exit', 'q'):
+        user_input = input('You: ').strip()
+        if not user_input:
+            continue
+        if user_input.lower() in ('quit', 'exit', 'q'):
             print('Goodbye!')
             break
-        if not query:
-            continue
 
-        report = orchestrator.run(query)
-        print('\n' + '=' * 50)
-        print(report)
-        print('=' * 50 + '\n')
+        response = manager.send(user_input)
+        print(f'\nAssistant: {response}\n')
 
-if __name__ == '__main__':
-            main()
+if __name__ == '__main__': main()

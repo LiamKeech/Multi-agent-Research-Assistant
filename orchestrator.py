@@ -33,61 +33,31 @@ class ResearchOrchestrator:
         print('All agents ready.\n')
 
     def run(self, query: str) -> str:
-        """Plan a workflow with Ollama and execute only the selected agents."""
         print(f'Orchestrator received query: "{query}"\n')
+        try:
+            print('[Step 1] Dispatching SearchAgent...')
+            results = self.search_agent.run(query)
+            if not results:
+                return 'No results found. Try a different query.'
+            print(f' Found {len(results)} results.\n')
 
-        follow_up = self._handle_follow_up(query)
-        if follow_up is not None:
-            return follow_up
+            print('[Step 2] Dispatching SummariserAgent...')
+            combined_text = ' '.join(r.get('snippet', '') for r in results)
+            summary = self.summariser_agent.run(combined_text)
+            print(' Summary complete.\n')
 
-        planned_agents = self._plan_agents(query)
-        execution_plan = self._expand_plan(planned_agents)
-        print(f'[Planner] Selected agents: {", ".join(execution_plan)}\n')
+            print('[Step 3] Dispatching CitationAgent...')
+            citations = self.citation_agent.run(results)
+            print(' Citations formatted.\n')
 
-        state = {
-            'search_results': [],
-            'summary': '',
-            'fact_check': '',
-            'citations': [],
-        }
+            return self._compile_report(query, summary, citations)
 
-        step = 1
-        for agent_name in execution_plan:
-            if agent_name == 'SearchAgent':
-                print(f'[Step {step}] Dispatching SearchAgent...')
-                state['search_results'] = self.search_agent.run(query)
-                if not state['search_results']:
-                    return 'No results found. Try a different query.'
-                print(f' Found {len(state["search_results"])} results.\n')
-
-            elif agent_name == 'SummariserAgent':
-                print(f'[Step {step}] Dispatching SummariserAgent...')
-                combined_text = ' '.join(r.get('snippet', '') for r in state['search_results'])
-                state['summary'] = self.summariser_agent.run(combined_text)
-                print(' Summary complete.\n')
-
-            elif agent_name == 'FactCheckerAgent':
-                print(f'[Step {step}] Dispatching FactCheckerAgent...')
-                state['fact_check'] = self.fact_checker_agent.run(state['summary'])
-                print(' Fact check complete.\n')
-
-            elif agent_name == 'CitationAgent':
-                print(f'[Step {step}] Dispatching CitationAgent...')
-                state['citations'] = self.citation_agent.run(state['search_results'])
-                print(' Citations formatted.\n')
-
-            step += 1
-
-        self.memory.append({
-            'query': query,
-            'search_results': list(state['search_results']),
-            'summary': state['summary'],
-            'fact_check': state['fact_check'],
-            'citations': list(state['citations']),
-        })
-
-        report = self._compile_report(query, state)
-        return report
+        except Exception as e:
+            return (
+                f'The research pipeline encountered a problem and could not ' 
+                f'complete. Error: {e}. ' 
+                f'Check that Ollama is running and try again.'
+            )
 
     def _handle_follow_up(self, query: str) -> str | None:
         """Resolve simple ordinal follow-up questions from session memory."""

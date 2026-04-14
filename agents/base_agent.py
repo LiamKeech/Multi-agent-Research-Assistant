@@ -10,11 +10,30 @@ class BaseAgent:
         self.system_prompt = system_prompt
         self.tools = tools
 
-    def _chat(self, messages: list[dict]) -> dict:
-        """Send messages to Ollama and return the response dict."""
-        payload = { 'model': MODEL, 'messages': messages, 'stream': False, }
-        response = requests.post(OLLAMA_URL, json=payload, timeout=60)
-        return response.json()
+    def _chat(self, messages: list[dict]) -> str:
+        payload = {
+            'model': MODEL,
+            'messages': messages,
+            'stream': False,
+        }
+        try:
+            response = requests.post(OLLAMA_URL, json=payload, timeout=60)
+            response.raise_for_status()  # catches non-200 HTTP responses
+            return response.json()['message']['content']
+
+        except requests.exceptions.ConnectionError:
+            return (
+                'I could not connect to Ollama'
+                'Please make sure it is running with: ollama serve'
+            )
+        except requests.exceptions.Timeout:
+            return (
+                'The request to Ollama timed out. '
+                'The model may be too large for your machine — '
+                'try switching to a smaller model like phi3 in base_agent.py.'
+            )
+        except requests.exceptions.RequestException as e:
+            return f'An unexpected error occurred: {e}'
 
     def _build_tool_prompt(self) -> str:
         """Describe tools to the model in the system prompt."""
