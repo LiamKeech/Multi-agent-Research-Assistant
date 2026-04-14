@@ -22,12 +22,13 @@ class FactCheckerAgent(BaseAgent):
         messages = [
             {'role': 'system', 'content': self.system_prompt},
             {'role': 'user', 'content': (
-                'Does this summary contain any likely false claims? List any concerns. '\
+                'Does this summary contain any likely false claims? List any concerns. '
                 'If there are no obvious issues, say so clearly.\n\n'
                 f'{cleaned_summary}'
             )},
         ]
 
-        response = self._chat(messages)
-        return response.get('message', {}).get('content', '').strip() or 'No fact-check response was generated.'
+        reply = self._chat(messages)  # _chat already returns text content
+        return (reply or '').strip() or 'No fact-check response was generated.'
+
 

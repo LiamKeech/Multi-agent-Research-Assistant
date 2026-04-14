@@ -46,11 +46,22 @@ class ResearchOrchestrator:
             summary = self.summariser_agent.run(combined_text)
             print(' Summary complete.\n')
 
-            print('[Step 3] Dispatching CitationAgent...')
+            print('[Step 3] Dispatching FactCheckerAgent...')
+            fact_check = self.fact_checker_agent.run(summary)
+            print(' Fact check complete.\n')
+
+            print('[Step 4] Dispatching CitationAgent...')
             citations = self.citation_agent.run(results)
             print(' Citations formatted.\n')
 
-            return self._compile_report(query, summary, citations)
+            state = {
+                'search_results': results,
+                'summary': summary,
+                'fact_check': fact_check,
+                'citations': citations,
+            }
+            return self._compile_report(query, state)
+
 
         except Exception as e:
             return (

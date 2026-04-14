@@ -18,7 +18,8 @@ class CitationAgent(BaseAgent):
         for r in results:
             citation = format_citation(
                 url=r.get('url', ''),
-                title=r.get('title', 'Untitled')
+                title=r.get('title', 'Untitled'),
+                author=r.get('author', '')
             )
             citations.append(citation)
         return citations

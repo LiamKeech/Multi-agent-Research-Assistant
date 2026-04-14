@@ -93,23 +93,13 @@ class ConversationManager:
             topic = tool_call['args'].get('topic', user_input)
             print(f'\n[ConversationManager] Research triggered for: "{topic}"')
 
-            # Run the full research pipeline
             report = self.orchestrator.run(topic)
 
-            # Inject the report back into the conversation
-            # so the model can respond naturally to it
-            messages.append({'role': 'assistant', 'content': reply})
-            messages.append({'role': 'user',
-                             'content': f'Here are the research results:\n\n{report}'})
-            final_reply = self._chat(messages)
-
-            # Save the whole exchange to history
             self.history.append({'role': 'user', 'content': user_input})
-            self.history.append({'role': 'assistant', 'content': final_reply})
-            return final_reply
+            self.history.append({'role': 'assistant', 'content': report})
 
-        else:
-            # Plain conversation — no tool needed
-            self.history.append({'role': 'user', 'content': user_input})
-            self.history.append({'role': 'assistant', 'content': reply})
-            return reply
+            return report
+
+        self.history.append({'role': 'user', 'content': user_input})
+        self.history.append({'role': 'assistant', 'content': reply})
+        return reply

@@ -37,8 +37,7 @@ class SearchAgent(BaseAgent):
             {'role': 'system', 'content': self.system_prompt},
             {'role': 'user', 'content': f'Find information about: {topic}'}
         ]
-        response = self._chat(messages)
-        reply = response['message']['content']
+        reply = self._chat(messages)
 
         tool_call = self._parse_tool_call(reply)
         if tool_call and tool_call['tool'] == 'web_search':
