@@ -1,9 +1,10 @@
 import requests
 import json
+import re
 from orchestrator import ResearchOrchestrator
 
 OLLAMA_URL = 'http://localhost:11434/api/chat'
-MODEL = 'llama3'
+MODEL = 'phi3'
 
 # Describe the orchestrator as a tool the LLM can call
 RESEARCH_TOOL = {
@@ -57,11 +58,23 @@ class ConversationManager:
 
     def _parse_tool_call(self, text: str) -> dict | None:
         try:
-            clean = text.strip().strip('`').strip()
-            if clean.startswith('{'):
-                data = json.loads(clean)
-                if 'tool' in data and 'args' in data:
-                    return data
+            clean = (text or '').strip()
+
+            # Remove markdown code fences like ```json ... ```
+            if clean.startswith('```'):
+                lines = clean.splitlines()
+                if len(lines) >= 3:
+                    clean = '\n'.join(lines[1:-1]).strip()
+
+            # If extra text exists, extract first JSON object region
+            start = clean.find('{')
+            end = clean.rfind('}')
+            if start != -1 and end != -1 and end > start:
+                clean = clean[start:end + 1]
+
+            data = json.loads(clean)
+            if isinstance(data, dict) and 'tool' in data and 'args' in data:
+                return data
         except json.JSONDecodeError:
             pass
         return None
@@ -88,6 +101,17 @@ class ConversationManager:
         reply = self._chat(messages)
 
         tool_call = self._parse_tool_call(reply)
+
+        follow_up_pattern = re.compile(
+            r'\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|\d+(?:st|nd|rd|th)?)\s+(result|item|option)\b',
+            re.IGNORECASE
+        )
+
+        if follow_up_pattern.search(user_input):
+            response = self.orchestrator.run(user_input)
+            self.history.append({'role': 'user', 'content': user_input})
+            self.history.append({'role': 'assistant', 'content': response})
+            return response
 
         if tool_call and tool_call['tool'] == 'run_research':
             topic = tool_call['args'].get('topic', user_input)

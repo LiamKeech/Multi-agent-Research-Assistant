@@ -34,6 +34,11 @@ class ResearchOrchestrator:
 
     def run(self, query: str) -> str:
         print(f'Orchestrator received query: "{query}"\n')
+
+        follow_up = self._handle_follow_up(query)
+        if follow_up is not None:
+            return follow_up
+
         try:
             print('[Step 1] Dispatching SearchAgent...')
             results = self.search_agent.run(query)
@@ -59,7 +64,17 @@ class ResearchOrchestrator:
                 'summary': summary,
                 'fact_check': fact_check,
                 'citations': citations,
+
             }
+
+            self.memory.append({
+                'query': query,
+                'search_results': list(results),
+                'summary': summary,
+                'fact_check': fact_check,
+                'citations': list(citations),
+            })
+
             return self._compile_report(query, state)
 
 

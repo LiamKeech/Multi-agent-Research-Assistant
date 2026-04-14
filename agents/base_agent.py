@@ -2,7 +2,7 @@ import requests
 import json
 
 OLLAMA_URL = 'http://localhost:11434/api/chat'
-MODEL = 'llama3'
+MODEL = 'phi3'
 
 class BaseAgent:
     def __init__(self, name: str, system_prompt: str, tools: list[dict]):
@@ -49,14 +49,25 @@ class BaseAgent:
         return '\n'.join(lines)
 
     def _parse_tool_call(self, text: str) -> dict | None:
-        """Try to parse the model response as a tool call JSON."""
         try:
-            # Strip Markdown code fences if present
-            clean = text.strip().strip('`').strip()
-            if clean.startswith('{'):
-                data = json.loads(clean)
-                if 'tool' in data and 'args' in data:
-                    return data
+            clean = (text or '').strip()
+
+            # Remove markdown code fences like ```json ... ```
+            if clean.startswith('```'):
+                lines = clean.splitlines()
+                if len(lines) >= 3:
+                    clean = '\n'.join(lines[1:-1]).strip()
+
+            # If extra text exists, extract first JSON object region
+            start = clean.find('{')
+            end = clean.rfind('}')
+            if start != -1 and end != -1 and end > start:
+                clean = clean[start:end + 1]
+
+            data = json.loads(clean)
+            if isinstance(data, dict) and 'tool' in data and 'args' in data:
+                return data
         except json.JSONDecodeError:
             pass
         return None
+
