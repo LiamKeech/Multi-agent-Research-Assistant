@@ -1,7 +1,7 @@
 import requests
 
 OLLAMA_URL = 'http://localhost:11434/api/chat'
-MODEL = 'llama3'
+MODEL = 'phi3'
 
 
 def summarise_text(text: str, model: str = MODEL, ollama_url: str = OLLAMA_URL) -> str:

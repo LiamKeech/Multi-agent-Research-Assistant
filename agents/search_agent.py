@@ -14,9 +14,11 @@ class SearchAgent(BaseAgent):
         super().__init__(
             name='SearchAgent',
             system_prompt=(
-                    'You are a research search specialist. ' 
-                    'When given a research topic, formulate a good search query ' 
-                    'and call the web_search tool.'
+                    'You are a research search specialist. '
+                    'When given a research topic, formulate a good search query '
+                    'and call the web_search tool. '
+                    'CRITICAL: The search tool only accepts extremely short, 1-to-2 word entities (e.g., "Python", "Photosynthesis", "Einstein"). '
+                    'NEVER use long phrases or sentences.'
                     + self._build_tool_prompt_static(TOOLS)
             ), tools=TOOLS
         )
