@@ -58,16 +58,23 @@ class BaseAgent:
                 if len(lines) >= 3:
                     clean = '\n'.join(lines[1:-1]).strip()
 
-            # If extra text exists, extract first JSON object region
+            # Find the first '{'
             start = clean.find('{')
-            end = clean.rfind('}')
-            if start != -1 and end != -1 and end > start:
-                clean = clean[start:end + 1]
+            if start == -1:
+                return None
 
-            data = json.loads(clean)
-            if isinstance(data, dict) and 'tool' in data and 'args' in data:
-                return data
-        except json.JSONDecodeError:
+            # Find the FIRST valid JSON by checking substrings backwards
+            # This handles trailing garbage but keeps nested braces safe!
+            end = clean.rfind('}')
+            while end > start:
+                try:
+                    data = json.loads(clean[start:end + 1])
+                    if isinstance(data, dict) and 'tool' in data and 'args' in data:
+                        return data
+                except json.JSONDecodeError:
+                    # Move to the previous '}' and try again
+                    end = clean.rfind('}', 0, end)
+        except Exception:
             pass
         return None
 

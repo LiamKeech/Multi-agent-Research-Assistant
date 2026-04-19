@@ -19,12 +19,11 @@ RESEARCH_TOOL = {
 
 SYSTEM_PROMPT = """You are a helpful research assistant. 
 You can answer general questions in plain conversation. 
-When the user explicitly asks you to research a topic — for example 
-by saying 'research X', 'look up X', or 'find information about X' — 
-you MUST respond with ONLY the following JSON and nothing else:
+When the user asks you to research, lookup, search, or find information about a topic, please rely on external sources rather than your own knowledge. 
+To do this, respond with exactly this JSON format and nothing else:
  {"tool": "run_research", "args": {"topic": "<topic>"}} 
- Do NOT use the tool for casual conversation or simple factual questions. 
- Only use it when the user clearly wants a research report."""
+Do not use the tool for casual conversation. 
+Important: Once you output the JSON object, stop generating text. Do not simulate a response."""
 
 class ConversationManager:
     def __init__(self):
@@ -66,16 +65,23 @@ class ConversationManager:
                 if len(lines) >= 3:
                     clean = '\n'.join(lines[1:-1]).strip()
 
-            # If extra text exists, extract first JSON object region
+            # Find the first '{'
             start = clean.find('{')
-            end = clean.rfind('}')
-            if start != -1 and end != -1 and end > start:
-                clean = clean[start:end + 1]
+            if start == -1:
+                return None
 
-            data = json.loads(clean)
-            if isinstance(data, dict) and 'tool' in data and 'args' in data:
-                return data
-        except json.JSONDecodeError:
+            # Find the FIRST valid JSON by checking substrings backwards
+            # This handles trailing garbage but keeps nested braces safe!
+            end = clean.rfind('}')
+            while end > start:
+                try:
+                    data = json.loads(clean[start:end + 1])
+                    if isinstance(data, dict) and 'tool' in data and 'args' in data:
+                        return data
+                except json.JSONDecodeError:
+                    # Move to the previous '}' and try again
+                    end = clean.rfind('}', 0, end)
+        except Exception:
             pass
         return None
 
@@ -103,7 +109,7 @@ class ConversationManager:
         tool_call = self._parse_tool_call(reply)
 
         follow_up_pattern = re.compile(
-            r'\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|\d+(?:st|nd|rd|th)?)\s+(result|item|option)\b',
+            r'\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|\d+(?:st|nd|rd|th)?)\s+(result|item|option|source)\b',
             re.IGNORECASE
         )
 
@@ -117,7 +123,7 @@ class ConversationManager:
             topic = tool_call['args'].get('topic', user_input)
             print(f'\n[ConversationManager] Research triggered for: "{topic}"')
 
-            report = self.orchestrator.run(topic)
+            report = self.orchestrator.run(user_input)
 
             self.history.append({'role': 'user', 'content': user_input})
             self.history.append({'role': 'assistant', 'content': report})

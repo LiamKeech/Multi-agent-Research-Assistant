@@ -40,24 +40,43 @@ class ResearchOrchestrator:
             return follow_up
 
         try:
-            print('[Step 1] Dispatching SearchAgent...')
-            results = self.search_agent.run(query)
-            if not results:
-                return 'No results found. Try a different query.'
-            print(f' Found {len(results)} results.\n')
+            # 1. Ask Ollama for the plan
+            plan = self._plan_agents(query)
 
-            print('[Step 2] Dispatching SummariserAgent...')
-            combined_text = ' '.join(r.get('snippet', '') for r in results)
-            summary = self.summariser_agent.run(combined_text)
-            print(' Summary complete.\n')
+            query_lower = query.lower()
+            if 'no summary' in query_lower or 'just sources' in query_lower:
+                plan = [a for a in plan if a not in ('SummariserAgent', 'FactCheckerAgent')]
 
-            print('[Step 3] Dispatching FactCheckerAgent...')
-            fact_check = self.fact_checker_agent.run(summary)
-            print(' Fact check complete.\n')
+            print(f'Agent Plan: {plan}\n')
 
-            print('[Step 4] Dispatching CitationAgent...')
-            citations = self.citation_agent.run(results)
-            print(' Citations formatted.\n')
+            # 2. Initialize variables in case an agent isn't called
+            results = []
+            summary = ""
+            fact_check = ""
+            citations = []
+
+            # 3. Dynamically loop through the plan
+            for step, agent_name in enumerate(plan, 1):
+                print(f'[Step {step}] Dispatching {agent_name}...')
+
+                if agent_name == 'SearchAgent':
+                    results = self.search_agent.run(query)
+                    if not results:
+                        return 'No results found. Try a different query.'
+                    print(f' Found {len(results)} results.\n')
+
+                elif agent_name == 'SummariserAgent':
+                    combined_text = ' '.join(r.get('snippet', '') for r in (results or []))
+                    summary = self.summariser_agent.run(combined_text)
+                    print(' Summary complete.\n')
+
+                elif agent_name == 'FactCheckerAgent':
+                    fact_check = self.fact_checker_agent.run(summary)
+                    print(' Fact check complete.\n')
+
+                elif agent_name == 'CitationAgent':
+                    citations = self.citation_agent.run(results)
+                    print(' Citations formatted.\n')
 
             state = {
                 'search_results': results,
@@ -143,8 +162,8 @@ class ResearchOrchestrator:
         }
 
         patterns = [
-            r'\b(?P<ordinal>first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|\d+)(?:st|nd|rd|th)?\s+(?:result|item|option)\b',
-            r'\b(?:result|item|option)\s+(?P<num>\d+)(?:st|nd|rd|th)?\b',
+            r'\b(?P<ordinal>first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|\d+)(?:st|nd|rd|th)?\s+(?:result|item|option|source)\b',
+            r'\b(?:result|item|option|source)\s+(?P<num>\d+)(?:st|nd|rd|th)?\b',
         ]
 
         for pattern in patterns:
@@ -181,10 +200,10 @@ class ResearchOrchestrator:
                         'Choose which agents to use for the user query. '
                         'Allowed agents: SearchAgent, SummariserAgent, FactCheckerAgent, CitationAgent. '
                         'Return ONLY a JSON list of agent names. '
-                        'Include any prerequisites needed for later agents to work. '
-                        'Examples: if you choose SummariserAgent, include SearchAgent first; '
-                        'if you choose FactCheckerAgent, include SearchAgent and SummariserAgent first; '
-                        'if you choose CitationAgent, include SearchAgent first.'
+                        'CRITICAL RULES: '
+                        '1. If the user asks to verify, fact-check, or check claims, you MUST include "FactCheckerAgent". '
+                        '2. If the user asks for NO summary or JUST sources, you MUST omit "SummariserAgent". '
+                        '3. Include any prerequisites needed (e.g., FactCheckerAgent requires SearchAgent and SummariserAgent). '
                     ),
                 },
                 {
@@ -246,6 +265,9 @@ class ResearchOrchestrator:
         for agent_name in planned_agents:
             self._collect_dependencies(agent_name, required)
             required.add(agent_name)
+
+        if 'SearchAgent' in required:
+            required.add('CitationAgent')
 
         return [agent_name for agent_name in self.AGENT_ORDER if agent_name in required]
 
